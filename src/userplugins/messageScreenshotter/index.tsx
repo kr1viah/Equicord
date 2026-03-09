@@ -51,14 +51,6 @@ function takeScreenshot() {
             }
         }
 
-        // if (shouldSplit) {
-        //     messages.push(
-        //         <div
-        //             style={{ padding: "16px" }}
-        //         ></div>
-        //     )
-        // }
-
         let clazz = "message__5126c cozyMessage__5126c wrapper_c19a55 cozy_c19a55 zalgo_c19a55"
         if (shouldSplit) clazz += " groupStart__5126c"
         if (message.mentioned) clazz += " mentioned__5126c"
