@@ -41,14 +41,14 @@ function takeScreenshot() {
         let shouldSplit = true
 
         if (prevMessage) {
-            if (prevMessage.author == message.author) {
-                const diff = Math.abs(prevMessage.timestamp.getTime() - message.timestamp.getTime());
-                shouldSplit = diff >= 7 * 60 * 1000;
+            const diff = Math.abs(prevMessage.timestamp.getTime() - message.timestamp.getTime());
+            shouldSplit = diff >= 7 * 60 * 1000;
 
-                if (prevMessage.timestamp.getDay() !== message.timestamp.getDay()) {
-                    shouldSplit = true
-                }
+            if (prevMessage.timestamp.getDay() !== message.timestamp.getDay()) {
+                shouldSplit = true
             }
+
+            shouldSplit = shouldSplit || prevMessage.author != message.author
         }
 
         let clazz = "message__5126c cozyMessage__5126c wrapper_c19a55 cozy_c19a55 zalgo_c19a55"
@@ -86,23 +86,19 @@ function takeScreenshot() {
 
     openModal(props =>
         <ErrorBoundary>
-                <div
-                    className="scrollerContent__36d07"
-                >
-                    <ol
-                        className="scrollerInner__36d07 group-spacing-16"
-                        style={{
-                            backgroundColor: "#1A1A1E"
-                        }}
-                        aria-label={""}
-                        role={"list"}
-                        data-list-id={"chat-messages"}
-                        tabIndex={0}
-                        aria-orientation="vertical"
-                    >
-                        {messages}
-                    </ol>
-                </div>
+            <ol
+                className="scrollerContent__36d07 content_d125d2 scrollerInner__36d07 group-spacing-16"
+                style={{
+                    backgroundColor: "#1A1A1E"
+                }}
+                aria-label={""}
+                role={"list"}
+                data-list-id={"chat-messages"}
+                tabIndex={0}
+                aria-orientation="vertical"
+            >
+                {messages}
+            </ol>
         </ErrorBoundary>
 );
 }
