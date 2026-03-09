@@ -86,36 +86,23 @@ function takeScreenshot() {
 
     openModal(props =>
         <ErrorBoundary>
-            <div
-                className={"messagesWrapper__36d07 group-spacing-16"}
-                style={{width: "100%", height: "100%", display: "flex"}}
-            >
                 <div
-                    className={"scroller__36d07 customTheme_d125d2 auto_d125d2 scrollerBase_d125d2 disableScrollAnchor_d125d2 managedReactiveScroller_d125d2"}
-                    dir={"ltr"}
-                    data-jump-section={"global"}
-                    tabIndex={-1}
-                    role={"group"}
+                    className="scrollerContent__36d07"
                 >
-                    <div
-                        className="scrollerContent__36d07 content_d125d2"
+                    <ol
+                        className="scrollerInner__36d07 group-spacing-16"
+                        style={{
+                            backgroundColor: "#1A1A1E"
+                        }}
+                        aria-label={""}
+                        role={"list"}
+                        data-list-id={"chat-messages"}
+                        tabIndex={0}
+                        aria-orientation="vertical"
                     >
-                        <ol
-                            className="scrollerInner__36d07"
-                            style={{
-                                backgroundColor: "#1A1A1E"
-                            }}
-                            aria-label={""}
-                            role={"list"}
-                            data-list-id={"chat-messages"}
-                            tabIndex={0}
-                            aria-orientation="vertical"
-                        >
-                            {messages}
-                        </ol>
-                    </div>
+                        {messages}
+                    </ol>
                 </div>
-            </div>
         </ErrorBoundary>
 );
 }
