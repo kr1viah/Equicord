@@ -90,25 +90,28 @@ function takeScreenshot(selectedMessages: Message[]) {
         prevMessage = message
     });
 
+    const el =
+        <div
+            className="scrollerContent__36d07 content_d125d2"
+        >
+            <ol
+                className="scrollerInner__36d07 group-spacing-16"
+                style={{
+                    backgroundColor: "#1A1A1E"
+                }}
+                aria-label={""}
+                role={"list"}
+                data-list-id={"chat-messages"}
+                tabIndex={0}
+                aria-orientation="vertical"
+            >
+                {messages}
+            </ol>
+        </div>
+
     openModal(props =>
         <ErrorBoundary>
-                <div
-                    className="scrollerContent__36d07 content_d125d2"
-                >
-                    <ol
-                        className="scrollerInner__36d07 group-spacing-16"
-                        style={{
-                            backgroundColor: "#1A1A1E"
-                        }}
-                        aria-label={""}
-                        role={"list"}
-                        data-list-id={"chat-messages"}
-                        tabIndex={0}
-                        aria-orientation="vertical"
-                    >
-                        {messages}
-                    </ol>
-                </div>
+            {el}
         </ErrorBoundary>
 );
 }
