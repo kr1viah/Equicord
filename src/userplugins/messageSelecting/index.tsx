@@ -32,11 +32,19 @@ function handleMessage(message: Message) {
         selectedMessages.splice(selectedMessages.indexOf(message), 1)
         domElement.classList.toggle("messageselector-selected", false)
     } else {
-        if (!selectedMessages.find(m2 => m2.id === message.id)) {
-            selectedMessages.push(message)
-            domElement.classList.toggle("messageselector-selected", true)
+        let msg: Message | undefined = selectedMessages.find(m2 => m2.id === message.id);
+        if (msg) {
+            while (msg) {
+                selectedMessages.splice(selectedMessages.indexOf(msg), 1)
+                msg = selectedMessages.find(m2 => m2.id === message.id)
+            }
+            domElement.classList.toggle("messageselector-selected", false)
+            return;
         }
+        selectedMessages.push(message)
+        domElement.classList.toggle("messageselector-selected", true)
     }
+
 
 }
 
