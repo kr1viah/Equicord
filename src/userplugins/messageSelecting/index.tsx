@@ -1,9 +1,10 @@
 import definePlugin from "@utils/types";
-import {ChannelStore} from "@webpack/common";
+import {ChannelStore, MessageStore} from "@webpack/common";
 import {Icon} from "@equicordplugins/translatePlus/utils/icon";
 import {Message} from "../../../packages/discord-types";
 import {enableStyle} from "@api/Styles";
 import textStyle from "./highlightStyle.css?managed";
+import {forEach} from "lodash";
 
 interface ChannelSelectEvent {
     type: "CHANNEL_SELECT";
@@ -31,14 +32,28 @@ function handleMessage(message: Message) {
         selectedMessages.splice(selectedMessages.indexOf(message), 1)
         domElement.classList.toggle("messageselector-selected", false)
     } else {
-        selectedMessages.push(message)
-        selectedMessages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
-        domElement.classList.toggle("messageselector-selected", true)
+        if (!selectedMessages.find(m2 => m2.id === message.id)) {
+            selectedMessages.push(message)
+            domElement.classList.toggle("messageselector-selected", true)
+        }
     }
 
 }
 
-export const selectedMessages: Message[] = []
+const selectedMessages: Message[] = []
+
+export function getSelectedMessages() {
+    let updatedMessages: Message[] = []
+
+    selectedMessages.forEach((message: Message) => {
+        message = MessageStore.getMessage(message.channel_id, message.id) ?? message;
+        updatedMessages.push(message)
+    })
+    updatedMessages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
+
+    return updatedMessages
+}
+
 
 export default definePlugin({
     name: "MultiSelect",

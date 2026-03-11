@@ -2,12 +2,13 @@ import {definePluginSettings} from "@api/Settings";
 import definePlugin, {OptionType} from "@utils/types";
 import {ChannelStore} from "@webpack/common";
 import {Icon} from "@equicordplugins/translatePlus/utils/icon";
-import {selectedMessages} from "../messageSelecting";
 import {findComponentByCodeLazy} from "@webpack";
 import {openModal} from "@utils/modal";
 import ErrorBoundary from "@components/ErrorBoundary";
 import React from "react";
 import {Message} from "../../../packages/discord-types";
+import {MessageFlags, MessageType} from "../../../packages/discord-types/enums";
+import {getSelectedMessages} from "../messageSelecting";
 
 const ChannelMessage = findComponentByCodeLazy("childrenExecutedCommand:", ".hideAccessories");
 
@@ -33,27 +34,32 @@ const settings = definePluginSettings({
     }
 });
 
-function takeScreenshot() {
+function shouldSplitF(message: Message, previousMessage: Message) {
+    if (!previousMessage)                                                                               return true
+    if (previousMessage.author.id !== message.author.id)                                                return true
+    if (Math.abs(previousMessage.timestamp.getTime() - message.timestamp.getTime()) >= 7 * 60 * 1000)   return true
+    if (!(message.type == MessageType.DEFAULT || message.type == MessageType.REPLY))                    return true
+    if (!(previousMessage.type == MessageType.DEFAULT || previousMessage.type == MessageType.REPLY))    return true
+    if (message.webhookId || previousMessage.webhookId)                                                 return true
+    if (message.interactionData || message.interactionMetadata)                                         return true
+    if (previousMessage.interactionData || previousMessage.interactionMetadata)                         return true
+    if (message.hasFlag(MessageFlags.EPHEMERAL) || previousMessage.hasFlag(MessageFlags.EPHEMERAL))     return true
+    if (previousMessage.timestamp.toDateString() !== message.timestamp.toDateString())                  return true
+    return false
+}
+
+function takeScreenshot(selectedMessages: Message[]) {
     const messages: React.JSX.Element[] = []
     let prevMessage: Message;
 
     selectedMessages.forEach(message => {
-        let shouldSplit = true
-
-        if (prevMessage) {
-            const diff = Math.abs(prevMessage.timestamp.getTime() - message.timestamp.getTime());
-            shouldSplit = diff >= 7 * 60 * 1000;
-
-            if (prevMessage.timestamp.getDay() !== message.timestamp.getDay()) {
-                shouldSplit = true
-            }
-
-            shouldSplit = shouldSplit || prevMessage.author != message.author
-        }
+        let shouldSplit = shouldSplitF(message, prevMessage);
 
         let clazz = "message__5126c cozyMessage__5126c wrapper_c19a55 cozy_c19a55 zalgo_c19a55"
         if (shouldSplit) clazz += " groupStart__5126c"
         if (message.mentioned) clazz += " mentioned__5126c"
+        // isSystemMessage_c19a55
+        // systemMessage__5126c
 
         const messageElement: React.JSX.Element = <ChannelMessage
             message={message}
@@ -86,19 +92,23 @@ function takeScreenshot() {
 
     openModal(props =>
         <ErrorBoundary>
-            <ol
-                className="scrollerContent__36d07 content_d125d2 scrollerInner__36d07 group-spacing-16"
-                style={{
-                    backgroundColor: "#1A1A1E"
-                }}
-                aria-label={""}
-                role={"list"}
-                data-list-id={"chat-messages"}
-                tabIndex={0}
-                aria-orientation="vertical"
-            >
-                {messages}
-            </ol>
+                <div
+                    className="scrollerContent__36d07 content_d125d2"
+                >
+                    <ol
+                        className="scrollerInner__36d07 group-spacing-16"
+                        style={{
+                            backgroundColor: "#1A1A1E"
+                        }}
+                        aria-label={""}
+                        role={"list"}
+                        data-list-id={"chat-messages"}
+                        tabIndex={0}
+                        aria-orientation="vertical"
+                    >
+                        {messages}
+                    </ol>
+                </div>
         </ErrorBoundary>
 );
 }
@@ -122,10 +132,12 @@ export default definePlugin({
                 message: message,
                 channel: ChannelStore.getChannel(message.channel_id),
                 onClick: () => {
+                    let selectedMessages = getSelectedMessages()
+
                     if (selectedMessages.length === 0) {
                         selectedMessages.push(message)
                     }
-                    takeScreenshot()
+                    takeScreenshot(selectedMessages)
                 },
             };
         }
