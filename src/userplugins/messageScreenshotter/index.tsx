@@ -6,7 +6,7 @@ import {findComponentByCodeLazy} from "@webpack";
 import {openModal} from "@utils/modal";
 import ErrorBoundary from "@components/ErrorBoundary";
 import {Message} from "../../../packages/discord-types";
-import {MessageFlags, MessageReferenceType, MessageType} from "../../../packages/discord-types/enums";
+import {MessageFlags, MessageType} from "../../../packages/discord-types/enums";
 import {getSelectedMessages} from "../messageSelecting";
 
 const ChannelMessage = findComponentByCodeLazy("childrenExecutedCommand:", ".hideAccessories");
@@ -54,6 +54,19 @@ const settings = definePluginSettings({
     excludeYourself: {
         description: "Exclude yourself from blurring",
         type: OptionType.BOOLEAN
+    },
+    blurCharacter: {
+        description: "Which character to use for blurring",
+        type: OptionType.SELECT,
+        options: [
+            { label: "_", value: "_", default: true },
+            { label: "-", value: "-" },
+            { label: "█", value: "█" },
+            { label: "—", value: "—" },
+            { label: "▚", value: "▚" },
+            { label: "━", value: "━" },
+            { label: "─", value: "─" },
+        ]
     }
 });
 
@@ -101,15 +114,15 @@ function getNewName(originalName: string, id: string) {
 
     if (mode === "underscore") {
         const nameLength = originalName.length;
-        return "_".repeat(nameLength);
+        return settings.store.blurCharacter.repeat(nameLength);
     }
     if (mode === "underscore_first_last") {
         const nameLength = originalName.length;
-        return originalName[0] + "_".repeat(nameLength-2) + originalName[nameLength-1];
+        return originalName[0] + settings.store.blurCharacter.repeat(nameLength-2) + originalName[nameLength-1];
     }
     if (mode === "blur") {
         const nameLength = lengthFromString(id);
-        return "_".repeat(nameLength);
+        return settings.store.blurCharacter.repeat(nameLength);
     }
 
     return originalName
@@ -148,7 +161,7 @@ function MessageItem({
     const liRef = React.useRef<HTMLLIElement | null>(null);
 
     React.useEffect(() => {
-        const root = liRef.current;
+        const root = liRef.current
 
         // region main message
 
@@ -192,6 +205,28 @@ function MessageItem({
             }
         }
         // endregion server tag
+
+        // region pinged people
+
+        // class `mention`
+
+        const messageContentElement = mainMessageElement?.querySelector(".messageContent_c19a55")!;
+
+        let i = 0
+        const mentions = [...message.content.matchAll(/<@(\d+)>/g)].map(m => m[1]);
+
+        Array.from(messageContentElement.children).forEach((child) => {
+            if (child.classList.contains("mention") && child instanceof HTMLSpanElement) {
+                const userMentioned = mentions[i]
+                child.innerText = "@" + getNewName(child.innerText.slice(1), userMentioned)
+                i++
+            }
+        })
+
+        console.log(message.mentions)
+        console.log(message.content)
+
+        // endregion pinged people
 
         // endregion main message
 
@@ -367,41 +402,3 @@ export default definePlugin({
         }
     }
 });
-
-// function cloneMessage(message: Message): Message {
-//     const e = {
-//         id: undefined,
-//         name: "",
-//         animated: true,
-//     }
-//
-//     const clone = {...message}
-//
-//     Object.setPrototypeOf(clone, Object.getPrototypeOf(message))
-//
-//     const cloneAuthor = {...message.author}
-//     Object.setPrototypeOf(cloneAuthor, Object.getPrototypeOf(message.author))
-//     message.author = cloneAuthor as User
-//
-//     return clone as Message;
-// }
-
-// function cloneMessage<T>(obj: T): T {
-//     if (obj === null || typeof obj !== "object") return obj;
-//
-//     if (obj instanceof Date) {
-//         return new Date(obj.getTime()) as T;
-//     }
-//
-//     if (Array.isArray(obj)) {
-//         return obj.map(cloneMessage) as T;
-//     }
-//
-//     const clone = Object.create(Object.getPrototypeOf(obj));
-//
-//     for (const key of Reflect.ownKeys(obj)) {
-//         clone[key as keyof typeof clone] = cloneMessage((obj as any)[key]);
-//     }
-//
-//     return clone;
-// }
