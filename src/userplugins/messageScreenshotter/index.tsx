@@ -1,13 +1,12 @@
 import {definePluginSettings} from "@api/Settings";
 import definePlugin, {OptionType} from "@utils/types";
-import {ChannelStore} from "@webpack/common";
+import {ChannelStore, MessageStore, React, UserStore} from "@webpack/common";
 import {Icon} from "@equicordplugins/translatePlus/utils/icon";
 import {findComponentByCodeLazy} from "@webpack";
 import {openModal} from "@utils/modal";
 import ErrorBoundary from "@components/ErrorBoundary";
-import React from "react";
 import {Message} from "../../../packages/discord-types";
-import {MessageFlags, MessageType} from "../../../packages/discord-types/enums";
+import {MessageFlags, MessageReferenceType, MessageType} from "../../../packages/discord-types/enums";
 import {getSelectedMessages} from "../messageSelecting";
 
 const ChannelMessage = findComponentByCodeLazy("childrenExecutedCommand:", ".hideAccessories");
@@ -22,17 +21,68 @@ function PopOverIcon() {
 }
 
 const settings = definePluginSettings({
-    clickAction: {
-        description: "Action to perform when clicking on a message",
+    names: {
+        description: "What to do with the names of people",
         type: OptionType.SELECT,
         options: [
             { label: "Do Nothing", value: "none", default: true },
-            { label: "Show Alert", value: "alert" },
-            { label: "Copy Message", value: "copy" },
-            { label: "Select message", value: "select" }
+            { label: "Turn into underscores of the same length", value: "underscore" },
+            { label: "Turn into underscores of the same length, but keep first and last letter the same", value: "underscore_first_last" },
+            { label: "Blur using underscores based on the user id", value: "blur" },
         ]
+    },
+    serverTag: {
+        description: "What to do with the server tags of people",
+        type: OptionType.SELECT,
+        options: [
+            { label: "Do Nothing", value: "none", default: true },
+            { label: "Remove", value: "remove" },
+        ]
+    },
+    pfp: {
+        description: "What to do with profile pictures",
+        type: OptionType.SELECT,
+        options: [
+            { label: "Do Nothing", value: "none", default: true },
+            { label: "Turn into solid color", value: "solid_color" },
+        ]
+    },
+    changeNameColor: {
+        description: "Change the color of the user when using the blur setting",
+        type: OptionType.BOOLEAN
+    },
+    excludeYourself: {
+        description: "Exclude yourself from blurring",
+        type: OptionType.BOOLEAN
     }
 });
+
+function lengthFromString(str: string): number {
+    let hash = 0;
+
+    for (let i = 0; i < str.length; i++) {
+        hash = (hash * 31 + str.charCodeAt(i)) | 0;
+    }
+
+    const range = 14;
+    return 3+(Math.abs(hash) % range);
+}
+
+function colorFromString(str: string): string {
+    let hash = 0;
+
+    for (let i = 0; i < str.length; i++) {
+        hash = (hash * 31 + str.charCodeAt(i)) | 0;
+    }
+
+    const r = (hash >> 16) & 255;
+    const g = (hash >> 8) & 255;
+    const b = hash & 255;
+
+    return `#${[r, g, b]
+        .map(v => (v & 255).toString(16).padStart(2, "0"))
+        .join("")}`;
+}
 
 function shouldSplitF(message: Message, previousMessage: Message) {
     if (!previousMessage)                                                                               return true
@@ -40,64 +90,204 @@ function shouldSplitF(message: Message, previousMessage: Message) {
     if (Math.abs(previousMessage.timestamp.getTime() - message.timestamp.getTime()) >= 7 * 60 * 1000)   return true
     if (!(message.type == MessageType.DEFAULT || message.type == MessageType.REPLY))                    return true
     if (!(previousMessage.type == MessageType.DEFAULT || previousMessage.type == MessageType.REPLY))    return true
-    if (message.webhookId || previousMessage.webhookId)                                                 return true
-    if (message.interactionData || message.interactionMetadata)                                         return true
-    if (previousMessage.interactionData || previousMessage.interactionMetadata)                         return true
     if (message.hasFlag(MessageFlags.EPHEMERAL) || previousMessage.hasFlag(MessageFlags.EPHEMERAL))     return true
     if (previousMessage.timestamp.toDateString() !== message.timestamp.toDateString())                  return true
     return false
 }
 
-function takeScreenshot(selectedMessages: Message[]) {
-    const messages: React.JSX.Element[] = []
-    let prevMessage: Message;
+function getNewName(originalName: string, id: string) {
+    if (excludeMyself(id)) return originalName;
+    const mode = settings.store.names;
 
-    selectedMessages.forEach(message => {
-        let shouldSplit = shouldSplitF(message, prevMessage);
+    if (mode === "underscore") {
+        const nameLength = originalName.length;
+        return "_".repeat(nameLength);
+    }
+    if (mode === "underscore_first_last") {
+        const nameLength = originalName.length;
+        return originalName[0] + "_".repeat(nameLength-2) + originalName[nameLength-1];
+    }
+    if (mode === "blur") {
+        const nameLength = lengthFromString(id);
+        return "_".repeat(nameLength);
+    }
 
-        let clazz = "message__5126c cozyMessage__5126c wrapper_c19a55 cozy_c19a55 zalgo_c19a55"
-        if (shouldSplit) clazz += " groupStart__5126c"
-        if (message.mentioned) clazz += " mentioned__5126c"
-        // isSystemMessage_c19a55
-        // systemMessage__5126c
+    return originalName
+}
 
-        const messageElement: React.JSX.Element = <ChannelMessage
-            message={message}
-            channel={ChannelStore.getChannel(message.channel_id)}
-            subscribeToComponentDispatch={false}
-            animateAvatar={false}
-            isGroupStart={shouldSplit}
-            compact={false}
-            renderThreadAccessory={true}
-            class={clazz}
-            role={"article"}
-            data-list-item-id={"chat-messages___chat-messages-" + message.channel_id + "-" + message.id}
+function shouldApplyColorForId(id: string) {
+    if (!settings.store.changeNameColor) return false;
+    if (settings.store.names !== "blur") return false;
+    if (excludeMyself(id)) return false;
+    return true;
+}
+
+function applyColorToElement(elem: Element | null, id: string) {
+    if (!elem || !(elem instanceof HTMLElement)) return;
+    if (shouldApplyColorForId(id)) {
+        const hex = colorFromString(id);
+        elem.style.setProperty("color", hex);
+    }
+}
+
+function excludeMyself(id: string) {
+    return id === UserStore.getCurrentUser().id && settings.store.excludeYourself;
+}
+
+function MessageItem({
+                         message,
+                         shouldSplit,
+                         clazz,
+                         settings,
+                     }: {
+    message: Message;
+    shouldSplit: boolean;
+    clazz: string;
+    settings: any;
+}) {
+    const liRef = React.useRef<HTMLLIElement | null>(null);
+
+    React.useEffect(() => {
+        const root = liRef.current;
+
+        // region main message
+
+        const mainMessageElement = root?.querySelector(".contents_c19a55")
+
+        // region username text and color
+        const usernameElement = mainMessageElement?.querySelector(".username_c19a55");
+        if (!usernameElement) return;
+
+        usernameElement.textContent = getNewName(usernameElement.textContent, message.author.id)
+        applyColorToElement(usernameElement, message.author.id);
+        // endregion username text and color
+
+        // region pfp color
+        const pfpElement = mainMessageElement?.querySelector(".avatar_c19a55")
+        if (settings.store.pfp === "solid_color" && !excludeMyself(message.author.id)) {
+            if (pfpElement instanceof HTMLImageElement) {
+                const hex = colorFromString(message.author.id);
+
+                const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+	<rect width="100%" height="100%" fill="${hex}"/>
+</svg>
+`;
+                pfpElement.src = "data:image/svg+xml," + encodeURIComponent(svg);
+            }
+
+            const avatarDecorationElement = mainMessageElement?.querySelector(".avatarDecoration_c19a55")
+            if (avatarDecorationElement) {
+                mainMessageElement?.removeChild(avatarDecorationElement);
+            }
+        }
+        // endregion pfp color
+
+        // region server tag
+        const serverTagElement = mainMessageElement?.querySelector(".clanTagChiplet_c19a55")
+        if (serverTagElement) {
+            if (settings.store.serverTag === "remove" && !excludeMyself(message.author.id)) {
+                const parent = serverTagElement.parentElement
+                parent?.parentElement?.removeChild(parent)
+            }
+        }
+        // endregion server tag
+
+        // endregion main message
+
+        // region reply message
+
+        if (message.type !== MessageType.REPLY) {
+            return
+        }
+
+        const replyElement = root?.querySelector(".repliedMessage_c19a55")
+        const replyMessageId = message.messageReference?.message_id!
+        const replyMessageChannelId = message.channel_id
+        const replyMessage = MessageStore.getMessage(replyMessageChannelId, replyMessageId);
+
+        if (!replyMessage && message.type === MessageType.REPLY) {
+            throw new Error("A message in your screenshot has a reply, but that message is not formally loaded. Please load all messages (including replies) in the screenshot fully.")
+        }
+
+        // region username text and color
+        const replyUsernameElement = replyElement?.querySelector(".username_c19a55");
+        if (replyUsernameElement) {
+            replyUsernameElement.textContent = getNewName(replyUsernameElement.textContent, replyMessage.author.id)
+            applyColorToElement(replyUsernameElement, replyMessage.author.id);
+        }
+        // endregion username text and color
+
+        // region pfp color
+        const replyPfpElement = replyElement?.querySelector(".replyAvatar_c19a55")
+        if (settings.store.pfp === "solid_color" && !excludeMyself(replyMessage.author.id)) {
+            if (replyPfpElement instanceof HTMLImageElement) {
+                const hex = colorFromString(replyMessage.author.id);
+
+                const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+	<rect width="100%" height="100%" fill="${hex}"/>
+</svg>
+`;
+                replyPfpElement.src = "data:image/svg+xml," + encodeURIComponent(svg);
+            }
+
+            const avatarDecorationElement = replyElement?.querySelector(".avatarDecoration_c19a55")
+            if (avatarDecorationElement) {
+                replyElement?.removeChild(avatarDecorationElement);
+            }
+        }
+        // endregion pfp color
+
+        // region server tag
+        const replyServerTagElement = replyElement?.querySelector(".clanTagChiplet_c19a55")
+        if (replyServerTagElement) {
+            if (settings.store.serverTag === "remove" && !excludeMyself(replyMessage.author.id)) {
+                const parent = replyServerTagElement.parentElement
+                parent?.parentElement?.removeChild(parent)
+            }
+        }
+        // endregion server tag
+
+        // endregion reply message
+    }, [message, settings]);
+
+    return (
+        <li
+            ref={liRef}
+            id={"chat-messages-" + message.channel_id + "-" + message.id}
+            className={"messageListItem__5126c"}
+            key={`msg-wrap-${message.id}`}
             aria-setsize={-1}
-            aria-roledescription={"Message"}
-        />
-
-        messages.push(
-            <li
-                id={"chat-messages-" + message.channel_id + "-" + message.id}
-                className={"messageListItem__5126c"}
-                aria-setsize={-1}
-                // key={`msg-wrap-${message.id}`}
-                // style={{ alignSelf: "flex-start", display: "inline-block" }}
-            >
-                {messageElement}
-            </li>
-        )
-        prevMessage = message
-    });
-
-    const el =
-        <div
-            className="scrollerContent__36d07 content_d125d2"
+            style={{ width: "1000px" }}
         >
+            <ChannelMessage
+                message={message}
+                channel={ChannelStore.getChannel(message.channel_id)}
+                subscribeToComponentDispatch={false}
+                animateAvatar={false}
+                isGroupStart={shouldSplit}
+                compact={false}
+                renderThreadAccessory={true}
+                class={clazz}
+                role={"article"}
+                data-list-item-id={
+                    "chat-messages___chat-messages-" + message.channel_id + "-" + message.id
+                }
+                aria-setsize={-1}
+                aria-roledescription={"Message"}
+            />
+        </li>
+    );
+}
+
+function MessageListModal({ messages, settings }: { messages: Message[]; settings: any }) {
+    return (
+        <div className="scrollerContent__36d07 content_d125d2">
             <ol
                 className="scrollerInner__36d07 group-spacing-16"
                 style={{
-                    backgroundColor: "#1A1A1E"
+                    backgroundColor: "#1A1A1E",
                 }}
                 aria-label={""}
                 role={"list"}
@@ -105,20 +295,38 @@ function takeScreenshot(selectedMessages: Message[]) {
                 tabIndex={0}
                 aria-orientation="vertical"
             >
-                {messages}
+                {messages.map((message, i) => {
+                    const prev = i > 0 ? messages[i - 1] : undefined;
+                    const shouldSplit = shouldSplitF(message, prev as any);
+                    let clazz = "message__5126c cozyMessage__5126c wrapper_c19a55 cozy_c19a55 zalgo_c19a55";
+                    if (shouldSplit) clazz += " groupStart__5126c";
+                    if (message.mentioned) clazz += " mentioned__5126c";
+
+                    return (
+                        <MessageItem
+                            key={String(message.id)}
+                            message={message}
+                            shouldSplit={shouldSplit}
+                            clazz={clazz}
+                            settings={settings}
+                        />
+                    );
+                })}
             </ol>
         </div>
-
-    openModal(props =>
-        <ErrorBoundary>
-            {el}
-        </ErrorBoundary>
-);
+    );
 }
 
+function takeScreenshot(selectedMessages: Message[]) {
+    openModal((props: any) => (
+        <ErrorBoundary>
+            <MessageListModal messages={selectedMessages} settings={settings}/>
+        </ErrorBoundary>
+    ));
+}
 export default definePlugin({
     name: "MessageScreenshot",
-    description: "Screenshot selected messages",
+    description: "Screenshot selected messages. qqq", // qqq for quick lookup
     authors: [{
         name: "kr1v",
         id: 1082702127014625371n
@@ -140,9 +348,54 @@ export default definePlugin({
                     if (selectedMessages.length === 0) {
                         selectedMessages.push(message)
                     }
-                    takeScreenshot(selectedMessages)
+
+                    let clone: Message[] = []
+
+                    selectedMessages.forEach(message => {
+                        clone.push(message.addReactionBatch([], []))
+                    })
+
+                    takeScreenshot(clone)
                 },
             };
         }
     }
 });
+
+// function cloneMessage(message: Message): Message {
+//     const e = {
+//         id: undefined,
+//         name: "",
+//         animated: true,
+//     }
+//
+//     const clone = {...message}
+//
+//     Object.setPrototypeOf(clone, Object.getPrototypeOf(message))
+//
+//     const cloneAuthor = {...message.author}
+//     Object.setPrototypeOf(cloneAuthor, Object.getPrototypeOf(message.author))
+//     message.author = cloneAuthor as User
+//
+//     return clone as Message;
+// }
+
+// function cloneMessage<T>(obj: T): T {
+//     if (obj === null || typeof obj !== "object") return obj;
+//
+//     if (obj instanceof Date) {
+//         return new Date(obj.getTime()) as T;
+//     }
+//
+//     if (Array.isArray(obj)) {
+//         return obj.map(cloneMessage) as T;
+//     }
+//
+//     const clone = Object.create(Object.getPrototypeOf(obj));
+//
+//     for (const key of Reflect.ownKeys(obj)) {
+//         clone[key as keyof typeof clone] = cloneMessage((obj as any)[key]);
+//     }
+//
+//     return clone;
+// }
