@@ -213,7 +213,13 @@ function MessageItem({
         // region username text and color
         const replyUsernameElement = replyElement?.querySelector(".username_c19a55");
         if (replyUsernameElement) {
-            replyUsernameElement.textContent = getNewName(replyUsernameElement.textContent, replyMessage.author.id)
+            let name = replyUsernameElement.textContent
+            if (name.startsWith("@")) {
+                name = "@" + getNewName(name.slice(1), replyMessage.author.id)
+            } else {
+                name = getNewName(name, replyMessage.author.id)
+            }
+            replyUsernameElement.textContent = name
             applyColorToElement(replyUsernameElement, replyMessage.author.id);
         }
         // endregion username text and color
