@@ -322,38 +322,42 @@ function MessageItem({
     );
 }
 
-function MessageListModal({ messages, settings }: { messages: Message[]; settings: any }) {
+function MessageListModal({ messages }: { messages: Message[] }) {
     return (
-        <div className="scrollerContent__36d07 content_d125d2">
-            <ol
-                className="scrollerInner__36d07 group-spacing-16"
-                style={{
-                    backgroundColor: "#1A1A1E",
-                }}
-                aria-label={""}
-                role={"list"}
-                data-list-id={"chat-messages"}
-                tabIndex={0}
-                aria-orientation="vertical"
-            >
-                {messages.map((message, i) => {
-                    const prev = i > 0 ? messages[i - 1] : undefined;
-                    const shouldSplit = shouldSplitF(message, prev as any);
-                    let clazz = "message__5126c cozyMessage__5126c wrapper_c19a55 cozy_c19a55 zalgo_c19a55";
-                    if (shouldSplit) clazz += " groupStart__5126c";
-                    if (message.mentioned) clazz += " mentioned__5126c";
+        <div>
+            // TODO: settings for individual users
+            <div className="scrollerContent__36d07 content_d125d2">
+                <ol
+                    className="scrollerInner__36d07 group-spacing-16"
+                    style={{
+                        backgroundColor: "#1A1A1E",
+                        marginBottom: "20px"
+                    }}
+                    aria-label={""}
+                    role={"list"}
+                    data-list-id={"chat-messages"}
+                    tabIndex={0}
+                    aria-orientation="vertical"
+                >
+                    {messages.map((message, i) => {
+                        const prev = i > 0 ? messages[i - 1] : undefined;
+                        const shouldSplit = shouldSplitF(message, prev as any);
+                        let clazz = "message__5126c cozyMessage__5126c wrapper_c19a55 cozy_c19a55 zalgo_c19a55";
+                        if (shouldSplit) clazz += " groupStart__5126c";
+                        if (message.mentioned) clazz += " mentioned__5126c";
 
-                    return (
-                        <MessageItem
-                            key={String(message.id)}
-                            message={message}
-                            shouldSplit={shouldSplit}
-                            clazz={clazz}
-                            settings={settings}
-                        />
-                    );
-                })}
-            </ol>
+                        return (
+                            <MessageItem
+                                key={String(message.id)}
+                                message={message}
+                                shouldSplit={shouldSplit}
+                                clazz={clazz}
+                                settings={settings}
+                            />
+                        );
+                    })}
+                </ol>
+            </div>
         </div>
     );
 }
@@ -361,7 +365,7 @@ function MessageListModal({ messages, settings }: { messages: Message[]; setting
 function takeScreenshot(selectedMessages: Message[]) {
     openModal((props: any) => (
         <ErrorBoundary>
-            <MessageListModal messages={selectedMessages} settings={settings}/>
+            <MessageListModal messages={selectedMessages}/>
         </ErrorBoundary>
     ));
 }
