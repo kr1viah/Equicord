@@ -100,7 +100,7 @@ function shouldSplitF(message: Message, previousMessage: Message) {
     if (!previousMessage)                                                                               return true
     if (previousMessage.author.id !== message.author.id)                                                return true
     if (Math.abs(previousMessage.timestamp.getTime() - message.timestamp.getTime()) >= 7 * 60 * 1000)   return true
-    if (!(message.type == MessageType.DEFAULT || message.type == MessageType.REPLY))                    return true
+    if (message.type != MessageType.DEFAULT)                                                            return true
     if (!(previousMessage.type == MessageType.DEFAULT || previousMessage.type == MessageType.REPLY))    return true
     if (message.hasFlag(MessageFlags.EPHEMERAL) || previousMessage.hasFlag(MessageFlags.EPHEMERAL))     return true
     if (previousMessage.timestamp.toDateString() !== message.timestamp.toDateString())                  return true
@@ -127,7 +127,7 @@ function getNewName(settingsGetter: (name: string, user?: string) => string, ori
 }
 
 function shouldApplyColorForId(settingsGetter: (name: string, user?: string) => string, id: string) {
-    if (settingsGetter("changeNameColor", id) == "true") return false;
+    if (settingsGetter("changeNameColor", id) == "false") return false;
     if (settingsGetter("names", id) !== "blur") return false;
     return true;
 }
@@ -290,7 +290,6 @@ function MessageItem({
             className={"messageListItem__5126c"}
             key={`msg-wrap-${message.id}`}
             aria-setsize={-1}
-            style={{ width: "1000px" }}
         >
             <ChannelMessage
                 message={message}
@@ -347,6 +346,7 @@ function MessageListModal({ messages }: { messages: Message[] }) {
                 }
             }
         }
+        result[0] = {...result[0], default: true}
         return result;
     }
 
@@ -374,10 +374,10 @@ function MessageListModal({ messages }: { messages: Message[] }) {
         if (userMap) {
             const value = userMap.get(name);
             if (value) {
-                return value;
+                return String(value);
             }
         }
-        return settings.store[name]
+        return String(settings.store[name])
     }
 
     const settingsKey = React.useMemo(() =>
@@ -393,6 +393,7 @@ function MessageListModal({ messages }: { messages: Message[] }) {
                 paddingLeft: "30px",
                 paddingRight: "30px",
                 paddingTop: "15px",
+                minHeight: "500px",
                 // padding: "16px",
             }}
         >
@@ -484,11 +485,11 @@ function MessageListModal({ messages }: { messages: Message[] }) {
                     </Heading>
                     <Select
                         options={[{
-                            value: "Yes",
-                            label: "true"
+                            label: "Yes",
+                            value: "true",
                         }, {
-                            value: "No",
-                            label: "false"
+                            label: "No",
+                            value: "false",
                         }, ]}
                         select={v => {
                             setSetting("changeNameColor", v)
@@ -497,7 +498,7 @@ function MessageListModal({ messages }: { messages: Message[] }) {
                             return getSetting("changeNameColor") == v
                         }}
                         serialize={v => String(v) }
-                        placeholder = {getSetting("changeNameColor")}
+                        placeholder = {getSetting("changeNameColor") ?? "false"}
                     >
                     </Select>
 
