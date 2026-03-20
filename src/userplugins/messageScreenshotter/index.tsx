@@ -1,14 +1,16 @@
 import {definePluginSettings} from "@api/Settings";
 import definePlugin, {OptionType} from "@utils/types";
-import {ChannelStore, MessageStore, React, UserStore} from "@webpack/common";
+import {ChannelStore, MessageStore, React, Select, UserStore} from "@webpack/common";
 import {Icon} from "@equicordplugins/translatePlus/utils/icon";
 import {findComponentByCodeLazy} from "@webpack";
 import {ModalCloseButton, ModalContent, ModalHeader, ModalRoot, ModalSize, openModal} from "@utils/modal";
 import ErrorBoundary from "@components/ErrorBoundary";
-import {Message} from "../../../packages/discord-types";
+import {Message, SelectOption} from "../../../packages/discord-types";
 import {MessageFlags, MessageType} from "../../../packages/discord-types/enums";
 import {getSelectedMessages} from "../messageSelecting";
 import {Button} from "@components/Button";
+import {Heading} from "@components/Heading";
+import {q} from "@equicordplugins/questify/utils/misc";
 
 const ChannelMessage = findComponentByCodeLazy("childrenExecutedCommand:", ".hideAccessories");
 
@@ -50,10 +52,6 @@ const settings = definePluginSettings({
     },
     changeNameColor: {
         description: "Change the color of the user when using the blur setting",
-        type: OptionType.BOOLEAN
-    },
-    excludeYourself: {
-        description: "Exclude yourself from blurring",
         type: OptionType.BOOLEAN
     },
     blurCharacter: {
@@ -109,55 +107,49 @@ function shouldSplitF(message: Message, previousMessage: Message) {
     return false
 }
 
-function getNewName(originalName: string, id: string) {
-    if (excludeMyself(id)) return originalName;
-    const mode = settings.store.names;
+function getNewName(settingsGetter: (name: string, user?: string) => string, originalName: string, id: string) {
+    const mode = settingsGetter("names", id);
 
     if (mode === "underscore") {
         const nameLength = originalName.length;
-        return settings.store.blurCharacter.repeat(nameLength);
+        return settingsGetter("blurCharacter", id).repeat(nameLength);
     }
     if (mode === "underscore_first_last") {
         const nameLength = originalName.length;
-        return originalName[0] + settings.store.blurCharacter.repeat(nameLength-2) + originalName[nameLength-1];
+        return originalName[0] + settingsGetter("blurCharacter", id).repeat(nameLength-2) + originalName[nameLength-1];
     }
     if (mode === "blur") {
         const nameLength = lengthFromString(id);
-        return settings.store.blurCharacter.repeat(nameLength);
+        return settingsGetter("blurCharacter", id).repeat(nameLength);
     }
 
     return originalName
 }
 
-function shouldApplyColorForId(id: string) {
-    if (!settings.store.changeNameColor) return false;
-    if (settings.store.names !== "blur") return false;
-    if (excludeMyself(id)) return false;
+function shouldApplyColorForId(settingsGetter: (name: string, user?: string) => string, id: string) {
+    if (settingsGetter("changeNameColor", id) == "true") return false;
+    if (settingsGetter("names", id) !== "blur") return false;
     return true;
 }
 
-function applyColorToElement(elem: Element | null, id: string) {
+function applyColorToElement(settingsGetter: (name: string, user?: string) => string, elem: Element | null, id: string) {
     if (!elem || !(elem instanceof HTMLElement)) return;
-    if (shouldApplyColorForId(id)) {
+    if (shouldApplyColorForId(settingsGetter, id)) {
         const hex = colorFromString(id);
         elem.style.setProperty("color", hex);
     }
-}
-
-function excludeMyself(id: string) {
-    return id === UserStore.getCurrentUser().id && settings.store.excludeYourself;
 }
 
 function MessageItem({
                          message,
                          shouldSplit,
                          clazz,
-                         settings,
+                         settingsGetter
                      }: {
-    message: Message;
-    shouldSplit: boolean;
-    clazz: string;
-    settings: any;
+    message: Message,
+    shouldSplit: boolean,
+    clazz: string,
+    settingsGetter: (name: string, user?: string) => string
 }) {
     const liRef = React.useRef<HTMLLIElement | null>(null);
 
@@ -172,13 +164,13 @@ function MessageItem({
         const usernameElement = mainMessageElement?.querySelector(".username_c19a55");
         if (!usernameElement) return;
 
-        usernameElement.textContent = getNewName(usernameElement.textContent, message.author.id)
-        applyColorToElement(usernameElement, message.author.id);
+        usernameElement.textContent = getNewName(settingsGetter, usernameElement.textContent, message.author.id)
+        applyColorToElement(settingsGetter, usernameElement, message.author.id);
         // endregion username text and color
 
         // region pfp color
         const pfpElement = mainMessageElement?.querySelector(".avatar_c19a55")
-        if (settings.store.pfp === "solid_color" && !excludeMyself(message.author.id)) {
+        if (settingsGetter("pfp", message.author.id) === "solid_color") {
             if (pfpElement instanceof HTMLImageElement) {
                 const hex = colorFromString(message.author.id);
 
@@ -200,7 +192,7 @@ function MessageItem({
         // region server tag
         const serverTagElement = mainMessageElement?.querySelector(".clanTagChiplet_c19a55")
         if (serverTagElement) {
-            if (settings.store.serverTag === "remove" && !excludeMyself(message.author.id)) {
+            if (settingsGetter("serverTag", message.author.id) === "remove") {
                 const parent = serverTagElement.parentElement
                 parent?.parentElement?.removeChild(parent)
             }
@@ -219,13 +211,10 @@ function MessageItem({
         Array.from(messageContentElement.children).forEach((child) => {
             if (child.classList.contains("mention") && child instanceof HTMLSpanElement) {
                 const userMentioned = mentions[i]
-                child.innerText = "@" + getNewName(child.innerText.slice(1), userMentioned)
+                child.innerText = "@" + getNewName(settingsGetter, child.innerText.slice(1), userMentioned)
                 i++
             }
         })
-
-        console.log(message.mentions)
-        console.log(message.content)
 
         // endregion pinged people
 
@@ -251,18 +240,18 @@ function MessageItem({
         if (replyUsernameElement) {
             let name = replyUsernameElement.textContent
             if (name.startsWith("@")) {
-                name = "@" + getNewName(name.slice(1), replyMessage.author.id)
+                name = "@" + getNewName(settingsGetter, name.slice(1), replyMessage.author.id)
             } else {
-                name = getNewName(name, replyMessage.author.id)
+                name = getNewName(settingsGetter, name, replyMessage.author.id)
             }
             replyUsernameElement.textContent = name
-            applyColorToElement(replyUsernameElement, replyMessage.author.id);
+            applyColorToElement(settingsGetter, replyUsernameElement, replyMessage.author.id);
         }
         // endregion username text and color
 
         // region pfp color
         const replyPfpElement = replyElement?.querySelector(".replyAvatar_c19a55")
-        if (settings.store.pfp === "solid_color" && !excludeMyself(replyMessage.author.id)) {
+        if (settingsGetter("pfp", replyMessage.author.id) === "solid_color") {
             if (replyPfpElement instanceof HTMLImageElement) {
                 const hex = colorFromString(replyMessage.author.id);
 
@@ -284,7 +273,7 @@ function MessageItem({
         // region server tag
         const replyServerTagElement = replyElement?.querySelector(".clanTagChiplet_c19a55")
         if (replyServerTagElement) {
-            if (settings.store.serverTag === "remove" && !excludeMyself(replyMessage.author.id)) {
+            if (settingsGetter("serverTag", replyMessage.author.id) === "remove") {
                 const parent = replyServerTagElement.parentElement
                 parent?.parentElement?.removeChild(parent)
             }
@@ -292,7 +281,7 @@ function MessageItem({
         // endregion server tag
 
         // endregion reply message
-    }, [message, settings]);
+    }, [message, settings, settingsGetter]);
 
     return (
         <li
@@ -324,10 +313,78 @@ function MessageItem({
 }
 
 function MessageListModal({ messages }: { messages: Message[] }) {
-    const [settingsActive, setSettingsActive] = React.useState(false);
-    if (!settingsActive) {
-        setSettingsActive(true);
+    const [settingsActive, setSettingsActive] = React.useState(true);
+    const [selectedUser, setSelectedUser] = React.useState<string | null>(null);
+
+    function getReply(message: Message) {
+        const replyId = message.messageReference?.message_id
+        const replyChannelId = message.messageReference?.channel_id
+        if (!replyId || !replyChannelId) return null;
+        return MessageStore.getMessage(replyChannelId, replyId) || null;
     }
+
+    function getUsers(messages: Message[]): SelectOption[] {
+        const seen = new Set<string>();
+        const result: SelectOption[] = [];
+        for (const m of messages) {
+            let userIds: {id: string, name: string}[] = [];
+
+            userIds.push({id: m.author.id, name: m.author.username})
+            const reply = getReply(m)
+            if (reply) {
+                userIds.push({id: reply.author.id, name: reply.author.username})
+            }
+            const mentions = [...m.content.matchAll(/<@(\d+)>/g)].map(m => m[1]);
+
+            for (const mention of mentions) {
+                userIds.push({id: mention, name: UserStore.getUser(mention).username})
+            }
+
+            for (const user of userIds) {
+                if (!seen.has(user.id)) {
+                    seen.add(user.id);
+                    result.push({ label: user.name, value: user.id });
+                }
+            }
+        }
+        return result;
+    }
+
+    const [overrideSettings, setOverrideSettings] = React.useState<Map<string, Map<string, string>>>(new Map());
+
+    function setValue(user: string, settingName: string, value: string) {
+        setOverrideSettings(prev => {
+            const next = new Map(prev);
+            if (!next.has(user)) {
+                next.set(user, new Map());
+            }
+            next.set(user, new Map(next.get(user)!).set(settingName, value));
+            return next;
+        });
+    }
+
+    function setSetting(name: string, v: string) {
+        setValue(selectedUser!, name, v)
+    }
+    function getSetting(name: string, user?: string): string {
+        user = (user || selectedUser)!;
+
+        const userMap = overrideSettings.get(user);
+
+        if (userMap) {
+            const value = userMap.get(name);
+            if (value) {
+                return value;
+            }
+        }
+        return settings.store[name]
+    }
+
+    const settingsKey = React.useMemo(() =>
+            JSON.stringify([...overrideSettings.entries()].map(([k, v]) => [k, [...v.entries()]])),
+        [overrideSettings]
+    );
+
     return (
         <div
             style={{
@@ -348,6 +405,7 @@ function MessageListModal({ messages }: { messages: Message[] }) {
                         position: "absolute",
                         top: "30px",
                         right: "30px",
+                        bottom: "30px",
                         width: 320,
                         background: "#111",
                         borderRadius: 12,
@@ -358,6 +416,106 @@ function MessageListModal({ messages }: { messages: Message[] }) {
                         color: "#fff",
                     }}
                 >
+                    <Heading className={q("form-subtitle")}>
+                        Select user
+                    </Heading>
+                    <Select
+                        options={getUsers(messages)}
+                        select={v => {
+                            setSelectedUser(v)
+                        }}
+                        isSelected={v => {
+                            return v == selectedUser
+                        }}
+                        serialize={v => String(v) }
+                    >
+                    </Select>
+
+                    <Heading className={q("form-subtitle")}>
+                        Names
+                    </Heading>
+                    <Select
+                        options={settings.def.names.options}
+                        select={v => {
+                            setSetting("names", v)
+                        }}
+                        isSelected={v => {
+                            return getSetting("names") === v
+                        }}
+                        serialize={v => String(v) }
+                        placeholder = {getSetting("names")}
+                    >
+                    </Select>
+
+                    <Heading className={q("form-subtitle")}>
+                        Server tag
+                    </Heading>
+                    <Select
+                        options={settings.def.serverTag.options}
+                        select={v => {
+                            setSetting("serverTag", v)
+                        }}
+                        isSelected={v => {
+                            return getSetting("serverTag") === v
+                        }}
+                        serialize={v => String(v) }
+                        placeholder = {getSetting("serverTag")}
+                    >
+                    </Select>
+
+                    <Heading className={q("form-subtitle")}>
+                        Profile picture
+                    </Heading>
+                    <Select
+                        options={settings.def.pfp.options}
+                        select={v => {
+                            setSetting("pfp", v)
+                        }}
+                        isSelected={v => {
+                            return getSetting("pfp") === v
+                        }}
+                        serialize={v => String(v) }
+                        placeholder = {getSetting("pfp")}
+                    >
+                    </Select>
+
+                    <Heading className={q("form-subtitle")}>
+                        Change name color
+                    </Heading>
+                    <Select
+                        options={[{
+                            value: "Yes",
+                            label: "true"
+                        }, {
+                            value: "No",
+                            label: "false"
+                        }, ]}
+                        select={v => {
+                            setSetting("changeNameColor", v)
+                        }}
+                        isSelected={v => {
+                            return getSetting("changeNameColor") == v
+                        }}
+                        serialize={v => String(v) }
+                        placeholder = {getSetting("changeNameColor")}
+                    >
+                    </Select>
+
+                    <Heading className={q("form-subtitle")}>
+                        Blur character to be used
+                    </Heading>
+                    <Select
+                        options={settings.def.blurCharacter.options}
+                        select={v => {
+                            setSetting("blurCharacter", v)
+                        }}
+                        isSelected={v => {
+                            return getSetting("blurCharacter") === v
+                        }}
+                        serialize={v => String(v) }
+                        placeholder = {getSetting("blurCharacter")}
+                    >
+                    </Select>
                 </div>
             )}
             <div className="scrollerContent__36d07 content_d125d2">
@@ -378,11 +536,11 @@ function MessageListModal({ messages }: { messages: Message[] }) {
 
                         return (
                             <MessageItem
-                                key={String(message.id)}
+                                key={String(message.id) + settingsKey}
                                 message={message}
                                 shouldSplit={shouldSplit}
                                 clazz={clazz}
-                                settings={settings}
+                                settingsGetter={getSetting}
                             />
                         );
                     })}
