@@ -349,6 +349,11 @@ function MessageListModal({ messages }: { messages: Message[] }) {
             const reply = getReply(m)
             if (reply) {
                 userIds.push({id: reply.author.id, name: reply.author.username})
+
+                const mentions = [...reply.content.matchAll(/<@(\d+)>/g)].map(m => m[1]);
+                for (const mention of mentions) {
+                    userIds.push({id: mention, name: UserStore.getUser(mention).username})
+                }
             }
             const mentions = [...m.content.matchAll(/<@(\d+)>/g)].map(m => m[1]);
 
