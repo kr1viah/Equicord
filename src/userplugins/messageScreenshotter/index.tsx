@@ -3,7 +3,7 @@ import definePlugin, {OptionType} from "@utils/types";
 import {ChannelStore, MessageStore, React, UserStore} from "@webpack/common";
 import {Icon} from "@equicordplugins/translatePlus/utils/icon";
 import {findComponentByCodeLazy} from "@webpack";
-import {openModal} from "@utils/modal";
+import {ModalCloseButton, ModalContent, ModalHeader, ModalRoot, ModalSize, openModal} from "@utils/modal";
 import ErrorBoundary from "@components/ErrorBoundary";
 import {Message} from "../../../packages/discord-types";
 import {MessageFlags, MessageType} from "../../../packages/discord-types/enums";
@@ -324,15 +324,19 @@ function MessageItem({
 
 function MessageListModal({ messages }: { messages: Message[] }) {
     return (
-        <div>
-            // TODO: settings for individual users
+        <div
+            style={{
+                backgroundColor: "#1A1A1E",
+                paddingBottom: "30px",
+                paddingLeft: "30px",
+                paddingRight: "30px",
+                paddingTop: "15px",
+                // padding: "16px",
+            }}
+        >
             <div className="scrollerContent__36d07 content_d125d2">
                 <ol
                     className="scrollerInner__36d07 group-spacing-16"
-                    style={{
-                        backgroundColor: "#1A1A1E",
-                        marginBottom: "20px"
-                    }}
                     aria-label={""}
                     role={"list"}
                     data-list-id={"chat-messages"}
@@ -364,9 +368,17 @@ function MessageListModal({ messages }: { messages: Message[] }) {
 
 function takeScreenshot(selectedMessages: Message[]) {
     openModal((props: any) => (
-        <ErrorBoundary>
-            <MessageListModal messages={selectedMessages}/>
-        </ErrorBoundary>
+        <ModalRoot size={ModalSize.DYNAMIC} {...props}>
+            <ModalHeader className={("screenshot-modal-header")}>
+                <span style={{color: "#FFF"}}>Screenshot</span>
+                <ModalCloseButton onClick={props.onClose} />
+            </ModalHeader>
+            <ModalContent className={("screenshot-modal")}>
+                <ErrorBoundary>
+                    <MessageListModal messages={selectedMessages}/>
+                </ErrorBoundary>
+            </ModalContent>
+        </ModalRoot>
     ));
 }
 export default definePlugin({
