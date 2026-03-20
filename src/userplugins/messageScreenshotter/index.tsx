@@ -66,6 +66,14 @@ const settings = definePluginSettings({
             { label: "━", value: "━" },
             { label: "─", value: "─" },
         ]
+    },
+    roleImage: {
+        description: "What to do with the role image",
+        type: OptionType.SELECT,
+        options: [
+            { label: "Do Nothing", value: "none", default: true },
+            { label: "Remove", value: "remove" },
+        ]
     }
 });
 
@@ -168,6 +176,17 @@ function MessageItem({
         applyColorToElement(settingsGetter, usernameElement, message.author.id);
         // endregion username text and color
 
+        // region role image
+
+        //roleIcon_c19a55
+        const roleIconElement = mainMessageElement?.querySelector(".roleIcon_ee71ee")
+        if (settingsGetter("roleImage", message.author.id) === "remove" && roleIconElement) {
+            const parent = roleIconElement.parentElement!
+            const itsParent = parent.parentElement!
+            itsParent.removeChild(parent)
+        }
+        // endregion role image
+
         // region pfp color
         const pfpElement = mainMessageElement?.querySelector(".avatar_c19a55")
         if (settingsGetter("pfp", message.author.id) === "solid_color") {
@@ -200,8 +219,6 @@ function MessageItem({
         // endregion server tag
 
         // region pinged people
-
-        // class `mention`
 
         const messageContentElement = mainMessageElement?.querySelector(".messageContent_c19a55")!;
 
@@ -394,7 +411,6 @@ function MessageListModal({ messages }: { messages: Message[] }) {
                 paddingRight: "30px",
                 paddingTop: "15px",
                 minHeight: "500px",
-                // padding: "16px",
             }}
         >
             <Button onClick={() => setSettingsActive(v => !v)}>
@@ -515,6 +531,22 @@ function MessageListModal({ messages }: { messages: Message[] }) {
                         }}
                         serialize={v => String(v) }
                         placeholder = {getSetting("blurCharacter")}
+                    >
+                    </Select>
+
+                    <Heading className={q("form-subtitle")}>
+                        What to do with the role image
+                    </Heading>
+                    <Select
+                        options={settings.def.roleImage.options}
+                        select={v => {
+                            setSetting("roleImage", v)
+                        }}
+                        isSelected={v => {
+                            return getSetting("roleImage") === v
+                        }}
+                        serialize={v => String(v) }
+                        placeholder = {getSetting("roleImage")}
                     >
                     </Select>
                 </div>
