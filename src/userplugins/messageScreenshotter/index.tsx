@@ -223,7 +223,7 @@ function MessageItem({
         const messageContentElement = mainMessageElement?.querySelector(".messageContent_c19a55")!;
 
         let i = 0
-        const mentions = [...message.content.matchAll(/<@(\d+)>/g)].map(m => m[1]);
+        let mentions = [...message.content.matchAll(/<@(\d+)>/g)].map(m => m[1]);
 
         Array.from(messageContentElement.children).forEach((child) => {
             if (child.classList.contains("mention") && child instanceof HTMLSpanElement) {
@@ -296,6 +296,23 @@ function MessageItem({
             }
         }
         // endregion server tag
+
+        // region pinged people
+
+        const replyMessageContentElement = replyElement?.querySelector(".repliedTextContent_c19a55")!;
+
+        i = 0
+        mentions = [...replyMessage.content.matchAll(/<@(\d+)>/g)].map(m => m[1]);
+
+        Array.from(replyMessageContentElement.children).forEach((child) => {
+            if (child.classList.contains("mention") && child instanceof HTMLSpanElement) {
+                const userMentioned = mentions[i]
+                child.innerText = "@" + getNewName(settingsGetter, child.innerText.slice(1), userMentioned)
+                i++
+            }
+        })
+
+        // endregion pinged people
 
         // endregion reply message
     }, [message, settings, settingsGetter]);
