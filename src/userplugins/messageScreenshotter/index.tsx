@@ -8,6 +8,7 @@ import ErrorBoundary from "@components/ErrorBoundary";
 import {Message} from "../../../packages/discord-types";
 import {MessageFlags, MessageType} from "../../../packages/discord-types/enums";
 import {getSelectedMessages} from "../messageSelecting";
+import {Button} from "@components/Button";
 
 const ChannelMessage = findComponentByCodeLazy("childrenExecutedCommand:", ".hideAccessories");
 
@@ -323,6 +324,10 @@ function MessageItem({
 }
 
 function MessageListModal({ messages }: { messages: Message[] }) {
+    const [settingsActive, setSettingsActive] = React.useState(false);
+    if (!settingsActive) {
+        setSettingsActive(true);
+    }
     return (
         <div
             style={{
@@ -334,6 +339,27 @@ function MessageListModal({ messages }: { messages: Message[] }) {
                 // padding: "16px",
             }}
         >
+            <Button onClick={() => setSettingsActive(v => !v)}>
+                Toggle settings
+            </Button>
+            {settingsActive && (
+                <div
+                    style={{
+                        position: "absolute",
+                        top: "30px",
+                        right: "30px",
+                        width: 320,
+                        background: "#111",
+                        borderRadius: 12,
+                        padding: 12,
+                        zIndex: 10,
+                        boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
+                        alignSelf: "right",
+                        color: "#fff",
+                    }}
+                >
+                </div>
+            )}
             <div className="scrollerContent__36d07 content_d125d2">
                 <ol
                     className="scrollerInner__36d07 group-spacing-16"
@@ -368,7 +394,7 @@ function MessageListModal({ messages }: { messages: Message[] }) {
 
 function takeScreenshot(selectedMessages: Message[]) {
     openModal((props: any) => (
-        <ModalRoot size={ModalSize.DYNAMIC} {...props}>
+        <ModalRoot size={ModalSize.LARGE} {...props}>
             <ModalHeader className={("screenshot-modal-header")}>
                 <span style={{color: "#FFF"}}>Screenshot</span>
                 <ModalCloseButton onClick={props.onClose} />
