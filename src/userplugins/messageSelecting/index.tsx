@@ -44,8 +44,6 @@ function handleMessage(message: Message) {
         selectedMessages.push(message)
         domElement.classList.toggle("messageselector-selected", true)
     }
-
-
 }
 
 const selectedMessages: Message[] = []
@@ -62,6 +60,35 @@ export function getSelectedMessages() {
     return updatedMessages
 }
 
+function isBetween(target: Date, date1: Date, date2: Date): boolean {
+    const t = target.getTime();
+    const a = date1.getTime();
+    const b = date2.getTime();
+
+    return t >= Math.min(a, b) && t <= Math.max(a, b);
+}
+
+function selectMessage(message: Message) {
+    const domElement = document.getElementById(
+        `chat-messages-${message.channel_id}-${message.id}`,
+    );
+    if (!domElement) return;
+
+    enableStyle(textStyle);
+    if (!selectedMessages.includes(message)) {
+        let msg: Message | undefined = selectedMessages.find(m2 => m2.id === message.id);
+        if (msg) {
+            while (msg) {
+                selectedMessages.splice(selectedMessages.indexOf(msg), 1)
+                msg = selectedMessages.find(m2 => m2.id === message.id)
+            }
+            domElement.classList.toggle("messageselector-selected", false)
+            return;
+        }
+        selectedMessages.push(message)
+        domElement.classList.toggle("messageselector-selected", true)
+    }
+}
 
 export default definePlugin({
     name: "MultiSelect",
@@ -71,30 +98,27 @@ export default definePlugin({
         id: 1082702127014625371n
     }],
 
-    onMessageClick(msg, channel, event) {
-        if (selectedMessages.length !== 0) {
-            handleMessage(msg)
+    onMessageClick(clickedMessage, channel, event) {
+        if (event.ctrlKey) {
+            handleMessage(clickedMessage)
+        } else if (event.shiftKey) {
+            const firstSelectedMessage = selectedMessages[0]
+            if (selectedMessages.length === 1 && firstSelectedMessage.id !== clickedMessage.id) {
+                const messages: Message[] =  MessageStore.getMessages(channel.id)
+                messages.forEach(message => {
+                    if (isBetween(message.timestamp, clickedMessage.timestamp, firstSelectedMessage.timestamp)) {
+                        selectMessage(message)
+                    }
+                })
+            } else {
+                handleMessage(clickedMessage)
+            }
         }
     },
 
     flux: {
         async CHANNEL_SELECT({ guildId, channelId }: ChannelSelectEvent) {
             selectedMessages.length = 0
-        }
-    },
-
-    messagePopoverButton: {
-        icon: Icon,
-        render(message) {
-            return {
-                label: "Select/unselect",
-                icon: PopOverIcon,
-                message: message,
-                channel: ChannelStore.getChannel(message.channel_id),
-                onClick: () => {
-                    handleMessage(message)
-                },
-            };
         }
     }
 });
