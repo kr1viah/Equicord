@@ -29,9 +29,9 @@ const settings = definePluginSettings({
         type: OptionType.SELECT,
         options: [
             { label: "Do Nothing", value: "none", default: true },
-            { label: "Turn into underscores of the same length", value: "underscore" },
-            { label: "Turn into underscores of the same length, but keep first and last letter the same", value: "underscore_first_last" },
-            { label: "Blur using underscores based on the user id", value: "blur" },
+            { label: "Turn into blur characters of the same length", value: "underscore" },
+            { label: "Turn into blur characters of the same length, but keep first and last letter the same", value: "underscore_first_last" },
+            { label: "Blur using blur characters based on the user id", value: "blur" },
         ]
     },
     serverTag: {
