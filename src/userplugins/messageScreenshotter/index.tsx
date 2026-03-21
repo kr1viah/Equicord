@@ -406,8 +406,8 @@ function MessageListModal({ messages }: { messages: Message[] }) {
         });
     }
 
-    function setSetting(name: string, v: string) {
-        setValue(selectedUser!, name, v)
+    function setSetting(name: string, v: string, user?: string) {
+        setValue(user ?? selectedUser!, name, v)
     }
     function getSetting(name: string, user?: string): string {
         user = (user || selectedUser)!;
@@ -436,7 +436,7 @@ function MessageListModal({ messages }: { messages: Message[] }) {
                 paddingLeft: "30px",
                 paddingRight: "30px",
                 paddingTop: "15px",
-                minHeight: "500px",
+                minHeight: "600px",
             }}
         >
             <Button onClick={() => setSettingsActive(v => !v)}>
@@ -459,6 +459,27 @@ function MessageListModal({ messages }: { messages: Message[] }) {
                         color: "#fff",
                     }}
                 >
+                    <Heading className={q("form-subtitle")}>
+                        Enable ping highlighting
+                    </Heading>
+                    <Select
+                        options={[{
+                            label: "Yes",
+                            value: "true",
+                        }, {
+                            label: "No",
+                            value: "false",
+                        }, ]}
+                        select={v => {
+                            setSetting("enablePingHighlighting", v, "global")
+                        }}
+                        isSelected={v => {
+                            return getSetting("enablePingHighlighting", "global") == v
+                        }}
+                        serialize={v => String(v) }
+                        placeholder = {getSetting("enablePingHighlighting", "global") ?? "false"}
+                    >
+                    </Select>
                     <Heading className={q("form-subtitle")}>
                         Select user
                     </Heading>
@@ -591,7 +612,7 @@ function MessageListModal({ messages }: { messages: Message[] }) {
                         const shouldSplit = shouldSplitF(message, prev as any);
                         let clazz = "message__5126c cozyMessage__5126c wrapper_c19a55 cozy_c19a55 zalgo_c19a55";
                         if (shouldSplit) clazz += " groupStart__5126c";
-                        if (message.mentioned) clazz += " mentioned__5126c";
+                        if (message.mentioned && (getSetting("enablePingHighlighting", "global") != "false")) clazz += " mentioned__5126c";
 
                         return (
                             <MessageItem
